@@ -29,22 +29,20 @@ class ElasticsearchHandler(logging.Handler):
     def emit(self, record):
         log_entry = self.format(record)
         try:
-            self.es.index(index=self.index, body={
-                "@timestamp": datetime.utcnow().isoformat(),
-                "level": record.levelname,
-                "message": record.getMessage(),
-                "host": self.hostname,
-                "module": record.module,
-                "line": record.lineno,
-                "func": record.funcName,
-                "logger": record.name
-            })
+            self.es.index(
+                index=self.index,
+                body={
+                    "@timestamp": datetime.utcnow().isoformat(),
+                    "host": self.hostname,
+                    **record.__dict__
+                }
+            )
         except Exception as e:
             print(f"Failed to send log to Elasticsearch: {e}")
 
 def get_logger(name="app_logger"):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     if not logger.handlers:
         es_handler = ElasticsearchHandler(
