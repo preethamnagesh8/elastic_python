@@ -6,6 +6,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, AIMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
 from pydantic import BaseModel, Field
+from config.config import Config
 
 
 class NewGPT(BaseChatModel):
