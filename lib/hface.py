@@ -6,8 +6,8 @@ class HuggingFaceClient:
         self.api_token = Config.get("HUGGING_FACE_READ_ONLY_TOKEN")
         self.base_url = "https://huggingface.co/api/daily_papers?date=2025-07-22"
 
-    def get_research_papers(self):
-        url = f"{self.base_url}"
+    def get_research_papers(self, date):
+        url = f"{self.base_url}".format(date=date)
         headers = {}
         if self.api_token:
             headers["Authorization"] = f"Bearer {self.api_token}"

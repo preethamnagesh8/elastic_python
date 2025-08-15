@@ -11,11 +11,11 @@ class ArxivClient:
     def __init__(self):
         self.client = arxiv.Client()
 
-    def get_paper_by_id(self, arxiv_id):
-        search = arxiv.Search(id_list=[arxiv_id])
+    def get_paper_by_id(self, arxiv_paper_id):
+        search = arxiv.Search(id_list=[arxiv_paper_id])
         for result in self.client.results(search):
             return {
-                "id": f"arxiv_{arxiv_id}",
+                "id": f"arxiv_{arxiv_paper_id}",
                 "title": result.title,
                 "authors": [author.name for author in result.authors],
                 "summary": result.summary,
@@ -32,7 +32,7 @@ class ArxivClient:
         else:
             raise Exception(f"Failed to download PDF: {response.status_code}")
 
-    def download_file(id, url, local_path):
+    def download_file(self, id, url, local_path):
         response = requests.get(url)
         if response.status_code == 200:
             with open(local_path + f"{id}.pdf", "wb") as f:
