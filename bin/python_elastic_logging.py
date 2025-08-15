@@ -90,8 +90,6 @@ def job():
             for q in ques:
                 answer = elastic_rag.query(q)
                 logger.info(f"Question: {q} | Answer: {answer}", extra={"job_id": str(uuid.uuid4())})
-                a = 10
-
 
     except Exception as e:
         logger.error(f"Error fetching paper: {e}", extra={"job_id": str(uuid.uuid4())})
