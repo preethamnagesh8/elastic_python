@@ -2,13 +2,9 @@ import uuid
 from langchain_core.messages import SystemMessage, HumanMessage
 from config.config import Config
 from lib.logger import get_logger
-from core import custom_completions
-import schedule
-import time
 from lib.arxiv_journal import ArxivClient
 from lib.hface import HuggingFaceClient
 from datetime import date
-from langchain.document_loaders import PyPDFLoader
 from core.custom_completions import NewGPT
 from core.custom_embeddings import NewEmbeddings
 from lib.elastic_rag import ElasticRAG
@@ -84,7 +80,6 @@ def job():
             )
 
             elastic_rag.ingest_documents(chunk_texts)
-
             ques = unique_questions.content.split(",")
 
             for q in ques:
