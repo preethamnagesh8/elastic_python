@@ -1,3 +1,4 @@
+from services.core.scheduler.base import ScheduledJob
 import uuid
 from langchain_core.messages import SystemMessage, HumanMessage
 from config.config import Config
@@ -11,32 +12,41 @@ from lib.elastic_rag import ElasticRAG
 import os
 from lib.pdf_loader import pdf_loader
 from lib.rag_chunking import chunk_documents
+from lib.elastic_db import ElasticDB
 
 logger = get_logger()
 
-def job():
-    logger.info("Job started", extra={"job_id": str(uuid.uuid4())})
-    arxiv_client = ArxivClient()
-    hface_client = HuggingFaceClient()
-    embedding_model = NewEmbeddings(
-        base_url=os.getenv("OPENAI_BASE_URL"),
-        api_key=os.getenv("OPENAI_RAG_API_SECRET"),
-        model=os.getenv("EMBEDDING_MODEL"),
-    )
-    llm = NewGPT(
-        base_url=os.getenv("OPENAI_BASE_URL"),
-        api_key=os.getenv("OPENAI_RAG_API_SECRET"),
-        model=os.getenv("OPENAI_CHAT_MODEL"),
-    )
-    elastic_rag = ElasticRAG(Config.get("ES_USERNAME"), Config.get("ES_PASSWORD"),embedding_model, llm)
-    try:
-        today_date_str = date.today().strftime("%Y-%m-%d")
+class HFaceResearchIngestionService(ScheduledJob):
+    """
+    Scheduled job for ingesting research documents into the HFace system.
+    This job handles the ingestion of research documents, including PDF loading,
+    chunking, embedding, and storing in a vector store.
+    """
 
-        research_papers = hface_client.get_research_papers(today_date_str)
+    def __init__(self):
+        self.arxiv_client = ArxivClient()
+        self.hface_client = HuggingFaceClient()
+        self.embedding_model = NewEmbeddings(
+            base_url=os.getenv("OPENAI_BASE_URL"),
+            api_key=os.getenv("OPENAI_RAG_API_SECRET"),
+            model=os.getenv("EMBEDDING_MODEL"),
+        )
+        self.llm = NewGPT(
+            base_url=os.getenv("OPENAI_BASE_URL"),
+            api_key=os.getenv("OPENAI_RAG_API_SECRET"),
+            model=os.getenv("OPENAI_CHAT_MODEL"),
+        )
+        self.elastic_rag = ElasticRAG(Config.get("ES_USERNAME"), Config.get("ES_PASSWORD"), self.embedding_model, self.llm)
+        self.aegis_questions_index = ElasticDB(Config.get("ES_USERNAME"), Config.get("ES_PASSWORD"), Config.get("AEGIS_QUESTIONS_INDEX"))
+
+    def run_automtion(self, **kwargs):
+        today_date_str = date.today().strftime("%Y-%m-%d")
+        research_papers = self.hface_client.get_research_papers(today_date_str)
+
         for res_paper in research_papers:
             logger.info(f"Paper found: {res_paper.get('title', 'No title')}", extra={"job_id": str(uuid.uuid4())})
-            paper = arxiv_client.get_paper_by_id(res_paper['paper']['id'])
-            arxiv_client.download_file(paper['id'], paper['pdf_url'], Config.get("DOWNLOAD_PATH", "local/docs/"))
+            paper = self.arxiv_client.get_paper_by_id(res_paper['paper']['id'])
+            self.arxiv_client.download_file(paper['id'], paper['pdf_url'], Config.get("DOWNLOAD_PATH", "local/docs/"))
 
             pages = pdf_loader(Config.get("DOWNLOAD_PATH", "local/docs/") + f"{paper['id']}.pdf")
             chunks = chunk_documents(pages)
@@ -44,7 +54,7 @@ def job():
             chunk_texts = []
             questions = []
             for chunk in chunks:
-                question = llm.invoke(
+                question = self.llm.invoke(
                     [
                         SystemMessage(
                             content=(
@@ -61,8 +71,7 @@ def job():
                 questions.append(question.content)
                 chunk_texts.append(chunk.page_content)
 
-
-            unique_questions = llm.invoke(
+            unique_questions = self.llm.invoke(
                 [
                     SystemMessage(
                         content=(
@@ -79,18 +88,11 @@ def job():
                 ]
             )
 
-            elastic_rag.ingest_documents(chunk_texts)
+            self.elastic_rag.ingest_documents(chunk_texts)
             ques = unique_questions.content.split(",")
+            self.aegis_questions_index.store(ques)
+
 
             for q in ques:
                 answer = elastic_rag.query(q)
                 logger.info(f"Question: {q} | Answer: {answer}", extra={"job_id": str(uuid.uuid4())})
-
-    except Exception as e:
-        logger.error(f"Error fetching paper: {e}", extra={"job_id": str(uuid.uuid4())})
-    logger.info("Job finished")
-
-
-if __name__ == '__main__':
-    x = 1  # Replace with your desired interval in minutes
-    job()
