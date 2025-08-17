@@ -32,3 +32,18 @@ class ElasticDB:
             return result["_source"]
         except Exception:
             return None
+
+    def update(self, doc_id: str, data: dict):
+        """
+        Update a document in Elasticsearch under the given index.
+        """
+        self.es_client.update(index=self.index_name, id=doc_id, doc=data)
+
+    def exists(self, doc_id: str) -> bool:
+        """
+        Check if a document exists in Elasticsearch by ID.
+        """
+        try:
+            return self.es_client.exists(index=self.index_name, id=doc_id)
+        except Exception:
+            return False
